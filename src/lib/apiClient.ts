@@ -58,7 +58,7 @@ export interface Pagination {
 // Dev falls back to localhost; a production build without VITE_API_URL is a
 // deploy mistake, so fail loudly instead of silently calling localhost.
 const BASE_URL: string =
-  import.meta.env.Backend_API_URL || (import.meta.env.DEV ? 'https://new-acme-paint-backend-1.onrender.com/api' : '');
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'https://new-acme-paint-backend-1.onrender.com/api' : '');
 if (!BASE_URL) {
   throw new Error('VITE_API_URL is not set. Configure it in your production environment.');
 }
