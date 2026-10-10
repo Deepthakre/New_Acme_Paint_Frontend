@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useState, useCallback, useRef, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import * as XLSX from 'xlsx';
 import PageShell from '../../components/layout/PageShell';
@@ -403,6 +403,52 @@ function BatchPanel({ catalog, accessories }: { catalog: ProductCatalogItem[]; a
   );
 }
 
+type LabelRotation = 0 | 90 | 270;
+
+// Shared label-paper settings for the label print dialogs: a preset (or a custom
+// size typed in mm) plus an optional rotation for printers that print sideways.
+function useLabelPaper() {
+  const [key, setKey] = useState(DEFAULT_THERMAL_LABEL_KEY);
+  const [rotation, setRotation] = useState<LabelRotation>(0);
+  const [customW, setCustomW] = useState('100');
+  const [customH, setCustomH] = useState('75');
+  const preset = THERMAL_LABEL_PRESETS.find((p) => p.key === key) || THERMAL_LABEL_PRESETS[0];
+  const isCustom = key === 'custom';
+  const width = isCustom ? Math.max(20, Number(customW) || 100) : preset.width;
+  const height = isCustom ? Math.max(20, Number(customH) || 75) : preset.height;
+  const paper = { width, height, rotation };
+  const controls = (
+    <div className="flex flex-wrap items-end gap-3">
+      <Field label="Label size (roll in printer)">
+        <Select value={key} onChange={(e) => setKey(e.target.value)}>
+          {THERMAL_LABEL_PRESETS.map((p) => (
+            <option key={p.key} value={p.key}>{p.label}</option>
+          ))}
+          <option value="custom">Custom size (type in mm)…</option>
+        </Select>
+      </Field>
+      {isCustom && (
+        <>
+          <Field label="Width (mm)">
+            <NumberInput value={customW} min={20} onChange={(e) => setCustomW(e.target.value)} style={{ width: 90 }} />
+          </Field>
+          <Field label="Height (mm)">
+            <NumberInput value={customH} min={20} onChange={(e) => setCustomH(e.target.value)} style={{ width: 90 }} />
+          </Field>
+        </>
+      )}
+      <Field label="Rotate print (if label comes out sideways)">
+        <Select value={String(rotation)} onChange={(e) => setRotation(Number(e.target.value) as LabelRotation)}>
+          <option value="0">Normal (no rotation)</option>
+          <option value="90">Rotate 90° right</option>
+          <option value="270">Rotate 90° left</option>
+        </Select>
+      </Field>
+    </div>
+  );
+  return { paper, controls };
+}
+
 interface LabelInfoRowsProps {
   catalogItem: ProductCatalogItem | null;
   batch: Batch;
@@ -450,8 +496,7 @@ function LabelInfoRows({ catalogItem, batch, size, qrId }: LabelInfoRowsProps) {
 function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalogItem: ProductCatalogItem | null; onClose: () => void }) {
   const items: (Carton | Product)[] = data.mode === 'multi' ? data.cartons : data.items;
   const [individualFor, setIndividualFor] = useState<string | null>(null);
-  const [labelKey, setLabelKey] = useState(DEFAULT_THERMAL_LABEL_KEY);
-  const labelSize = THERMAL_LABEL_PRESETS.find((p) => p.key === labelKey) || THERMAL_LABEL_PRESETS[0];
+  const { paper: labelSize, controls: paperControls } = useLabelPaper();
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 print:static print:bg-transparent print:block print:p-0">
@@ -482,19 +527,12 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
             <LinkButton onClick={onClose}>Close</LinkButton>
           </div>
         </div>
-        <div className="flex flex-wrap items-end gap-4 mb-3 no-print">
-          <Field label="Label roll loaded in the printer">
-            <Select value={labelKey} onChange={(e) => setLabelKey(e.target.value)}>
-              {THERMAL_LABEL_PRESETS.map((p) => (
-                <option key={p.key} value={p.key}>{p.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <p className="text-xs text-ink-soft flex-1 min-w-[240px]">
-            Printing on a {labelSize.width}mm x {labelSize.height}mm label — QR and all details are
-            printed together on the same label. Before printing: pick the SAME size as paper size in
-            the printer dialog/driver (it must match the roll, landscape), set Margins to "None" and
-            Scale to "Default/100%" — otherwise the printer will split one label across two.
+        <div className="mb-3 no-print">
+          {paperControls}
+          <p className="text-xs text-ink-soft mt-2">
+            QR and all details print together on ONE label ({labelSize.width}mm x {labelSize.height}mm). In the print
+            dialog set Paper size = same label size, Margins = None, Scale = 100%. If the label comes out sideways or
+            text is cut, use "Rotate print" or type your roll's exact size under Custom size.
           </p>
         </div>
         <div className="print-area thermal-label-sheet grid grid-cols-2 gap-4">
@@ -525,7 +563,8 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
           cartonId={individualFor}
           catalogItem={catalogItem}
           batch={data.batch}
-          initialLabelKey={labelKey}
+          paper={labelSize}
+          paperControls={paperControls}
           onClose={() => setIndividualFor(null)}
         />
       )}
@@ -537,17 +576,16 @@ interface IndividualQrModalProps {
   cartonId: string;
   catalogItem: ProductCatalogItem | null;
   batch: Batch;
-  initialLabelKey: string;
+  paper: { width: number; height: number; rotation: LabelRotation };
+  paperControls: ReactNode;
   onClose: () => void;
 }
 
 // Drill-down from a carton QR to the individual unit QRs inside it — the
 // carton label is for bulk handling, but each bucket still needs its own
 // scannable, printable identity for retail/verify use.
-function IndividualQrModal({ cartonId, catalogItem, batch, initialLabelKey, onClose }: IndividualQrModalProps) {
+function IndividualQrModal({ cartonId, catalogItem, batch, paper: labelSize, paperControls, onClose }: IndividualQrModalProps) {
   const [units, setUnits] = useState<Product[] | null>(null);
-  const [labelKey, setLabelKey] = useState(initialLabelKey || DEFAULT_THERMAL_LABEL_KEY);
-  const labelSize = THERMAL_LABEL_PRESETS.find((p) => p.key === labelKey) || THERMAL_LABEL_PRESETS[0];
 
   useEffect(() => {
     api.getCartonUnits(cartonId).then((data) => setUnits(data.items));
@@ -579,15 +617,7 @@ function IndividualQrModal({ cartonId, catalogItem, batch, initialLabelKey, onCl
             <LinkButton onClick={onClose}>Close</LinkButton>
           </div>
         </div>
-        <div className="mb-3 no-print">
-          <Field label="Label roll loaded in the printer">
-            <Select value={labelKey} onChange={(e) => setLabelKey(e.target.value)}>
-              {THERMAL_LABEL_PRESETS.map((p) => (
-                <option key={p.key} value={p.key}>{p.label}</option>
-              ))}
-            </Select>
-          </Field>
-        </div>
+        <div className="mb-3 no-print">{paperControls}</div>
         {!units ? (
           <p className="text-sm text-ink-soft">Loading…</p>
         ) : (

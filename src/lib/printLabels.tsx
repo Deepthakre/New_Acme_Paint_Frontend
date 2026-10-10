@@ -15,6 +15,11 @@ export interface LabelPaper {
   width: number;
   /** Label height in mm (the side along the roll). */
   height: number;
+  /**
+   * Turns the whole printed content. Use it when the printer prints the label
+   * sideways: 90 = rotate clockwise, 270 = rotate counter-clockwise.
+   */
+  rotation?: 0 | 90 | 270;
 }
 
 function esc(s: string): string {
@@ -36,17 +41,27 @@ export function printThermalLabels(labels: PrintableLabel[], paper: LabelPaper):
   if (labels.length === 0) return;
 
   const { width, height } = paper;
+  const rotation = paper.rotation ?? 0;
+  const rotated = rotation !== 0;
   const isLandscape = width >= height;
-  const boxH = height - 0.6; // safety margin: never let a label overflow its page
-  const padX = 3; // keeps text away from the left/right edge (no clipping)
-  const padY = 2;
+  // Content box: always a little smaller than the real label so rounding can
+  // never push one label onto a second page.
+  const cw = rotated ? width - 0.6 : width;
+  const ch = height - 0.6;
+  // Physical page handed to the printer (axes swap when content is rotated).
+  const pageW = rotated ? height : width;
+  const pageH = rotated ? width : height;
+  const pdH = pageH - 0.6; // page <div> is also slightly shorter than the page
+  const padX = 4; // keeps text away from the edges (no clipping)
+  const padY = 3;
   const gap = 3;
-  // QR stays large enough to scan easily (never below 30mm); the detail text
-  // shrinks to fit in the remaining space instead.
+  // Small but still easy to scan (never below 22mm); the text shrinks to fit.
   const qr = isLandscape
-    ? Math.max(30, Math.min(boxH - 2 * padY, Math.round(width * 0.4)))
-    : Math.max(30, Math.min(width - 2 * padX, Math.round(height * 0.34)));
-  const infoH = isLandscape ? boxH - 2 * padY : boxH - 2 * padY - qr - gap;
+    ? Math.max(22, Math.min(ch - 2 * padY, Math.round(width * 0.3)))
+    : Math.max(22, Math.min(cw - 2 * padX, Math.round(height * 0.26)));
+  const infoH = isLandscape ? ch - 2 * padY : ch - 2 * padY - qr - gap;
+  const transform =
+    rotation === 90 ? `translateX(${ch}mm) rotate(90deg)` : rotation === 270 ? `translateY(${cw}mm) rotate(-90deg)` : 'none';
 
   const body = labels
     .map((l) => {
@@ -57,24 +72,28 @@ export function printThermalLabels(labels: PrintableLabel[], paper: LabelPaper):
         .map(([k, v]) => `<div class="row"><b>${esc(k)}:</b> ${esc(v)}</div>`)
         .join('');
       const footer = l.footer ? `<div class="row foot">${esc(l.footer)}</div>` : '';
-      return `<div class="label"><div class="qr">${svg}</div><div class="info">${rows}${footer}</div></div>`;
+      return `<div class="page"><div class="label"><div class="qr">${svg}</div><div class="info">${rows}${footer}</div></div></div>`;
     })
     .join('');
 
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Labels</title><style>
-    @page { size: ${width}mm ${height}mm; margin: 0; }
+    @page { size: ${pageW}mm ${pageH}mm; margin: 0; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; }
-    .label {
-      width: ${width}mm; height: ${boxH}mm; padding: ${padY}mm ${padX}mm;
-      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: flex-start; gap: ${gap}mm;
-      overflow: hidden; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid;
-      font-family: Arial, Helvetica, sans-serif; color: #000;
+    .page {
+      width: ${pageW}mm; height: ${pdH}mm; position: relative; overflow: hidden;
+      page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid;
     }
-    .label:last-child { page-break-after: auto; break-after: auto; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+    .label {
+      position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: ${transform};
+      width: ${cw}mm; height: ${ch}mm; padding: ${padY}mm ${padX}mm;
+      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: flex-start; gap: ${gap}mm;
+      overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000;
+    }
     .qr { flex: 0 0 auto; width: ${qr}mm; height: ${qr}mm; }
     .qr svg { width: ${qr}mm; height: ${qr}mm; display: block; }
-    .info { flex: 1 1 auto; min-width: 0; width: 100%; height: ${infoH}mm; overflow: hidden; line-height: 1.18; font-size: 14px; }
+    .info { flex: 1 1 auto; min-width: 0; width: 100%; height: ${infoH}mm; overflow: hidden; line-height: 1.15; font-size: 11px; }
     .row { overflow-wrap: anywhere; }
     .row b { font-weight: 700; }
     .foot { margin-top: 1mm; padding-top: 0.8mm; border-top: 0.2mm solid #000; }
@@ -98,7 +117,7 @@ export function printThermalLabels(labels: PrintableLabel[], paper: LabelPaper):
   // Shrink each label's text until every row fits inside its box.
   const fit = () => {
     doc.querySelectorAll<HTMLElement>('.info').forEach((el) => {
-      let size = 14;
+      let size = 11;
       el.style.fontSize = `${size}px`;
       while (el.scrollHeight > el.clientHeight + 0.5 && size > 3) {
         size -= 0.25;
