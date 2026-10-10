@@ -8,6 +8,7 @@ import Button, { LinkButton } from '../../components/ui/Button';
 import QrScanner from '../../components/ui/QrScanner';
 import * as api from '../../lib/apiClient';
 import { verifyUrl, extractScannedId } from '../../lib/qr';
+import { printThermalLabels } from '../../lib/printLabels';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import {
   COMPANY_INFO,
@@ -15,7 +16,6 @@ import {
   ACCESSORY_CATEGORIES,
   THERMAL_LABEL_PRESETS,
   DEFAULT_THERMAL_LABEL_KEY,
-  type ThermalLabelPreset,
 } from '../../lib/constants';
 import type {
   AccessoryItem,
@@ -27,89 +27,6 @@ import type {
   Product,
   ProductCatalogItem,
 } from '../../types';
-
-// CSS mm -> px is a fixed ratio in every browser (1mm = 96/25.4 px), so we
-// can size the label text purely from arithmetic — no DOM measurement, no
-// "flash of wrong size" before print.
-const MM_TO_PX = 96 / 25.4;
-// Must match the number of rows LabelInfoRows always renders (QR ID,
-// Product Name, Item Code, Batch No, USP No, Size/Qty, MRP, Mfg Date,
-// Manufactured By, Address, Email, Website, Helpline).
-const LABEL_INFO_BASE_ROWS = 13;
-// Multiplier over the raw font size to approximate one printed line's real
-// height (font-size * line-height). Deliberately a bit above the CSS
-// `leading-snug` (1.375) it's paired with, so the estimate is conservative
-// and errs toward shrinking text rather than letting it clip.
-const LINE_HEIGHT_FACTOR = 1.45;
-
-// `labelSize` is whichever THERMAL_LABEL_PRESETS entry the admin picked in
-// the modal — re-runs whenever they switch rolls mid-session. `extraTextRows`
-// lets a caller account for extra lines it renders below the fixed 13 (e.g.
-// the "units in this carton" / "Status: Activated" row + its divider), so
-// the font-size math below still reflects everything that has to fit.
-function useThermalPageSize(labelSize: ThermalLabelPreset, extraTextRows = 0): void {
-  const { width, height } = labelSize;
-  useEffect(() => {
-    const isRow = width >= height;
-    const crossAxis = isRow ? height : width;
-    const mainAxis = isRow ? width : height;
-    const qrSize = Math.max(10, Math.min(crossAxis - 8, Math.round(mainAxis * 0.5)));
-
-    // Text was still getting cut off even after the QR fix above: the text
-    // block itself was always rendered at a fixed 10px regardless of how
-    // much room was actually left, so `overflow:hidden` silently sliced off
-    // whichever rows (usually Website/Helpline, at the bottom) didn't fit.
-    // Fix: shrink the font to whatever size the remaining space can hold, so
-    // every row always fits — text can get small, but it's never dropped.
-    const paddingMm = 1; // .thermal-label padding: 0.5mm each side (index.css)
-    const gapMm = isRow ? 0 : 12 / MM_TO_PX; // Tailwind gap-3, only eats into
-    // the stacking axis, i.e. only when QR and text stack in a column
-    const dividerMm = extraTextRows > 0 ? 16 / MM_TO_PX + 1 : 0; // mt-2 + pt-2 + border-t
-    const textAreaMm = Math.max(
-      4,
-      (isRow ? crossAxis : mainAxis - qrSize) - paddingMm - gapMm - dividerMm
-    );
-    const totalRows = LABEL_INFO_BASE_ROWS + extraTextRows;
-    const fontSizeMm = textAreaMm / (totalRows * LINE_HEIGHT_FACTOR);
-    // Never scale text back UP past the original 10px design size (bigger
-    // rolls have plenty of room already) — only ever shrink it to fit.
-    // Floor of 3px keeps it legible under a loupe rather than vanishing.
-    const fontSizePx = Math.max(3, Math.min(10, fontSizeMm * MM_TO_PX));
-
-    const style = document.createElement('style');
-    style.textContent = `
-      @page { size: ${width}mm ${height}mm; margin: 0; }
-      @media print {
-        .print-area.thermal-label-sheet .thermal-label {
-          box-sizing: border-box;
-          width: ${width}mm !important;
-          height: ${height}mm !important;
-          flex-direction: ${isRow ? 'row' : 'column'} !important;
-          justify-content: flex-start !important;
-          align-items: center !important;
-        }
-        .print-area.thermal-label-sheet .thermal-label svg {
-          width: ${qrSize}mm !important;
-          height: ${qrSize}mm !important;
-          flex-shrink: 0 !important;
-        }
-        .print-area.thermal-label-sheet .thermal-label .label-info {
-          display: block !important;
-          overflow: hidden !important;
-        }
-        .print-area.thermal-label-sheet .thermal-label .label-info,
-        .print-area.thermal-label-sheet .thermal-label .label-info * {
-          font-size: ${fontSizePx.toFixed(2)}px !important;
-          line-height: 1.25 !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      style.remove();
-    };
-  }, [width, height, extraTextRows]);
-}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -498,8 +415,8 @@ interface LabelInfoRowsProps {
 // `catalogItem` is null for accessories (brushes/rollers/tools aren't in the
 // Product Master), so those fall back to the company's own details — same
 // manufacturer info that already prints on every paint label.
-function LabelInfoRows({ catalogItem, batch, size, qrId }: LabelInfoRowsProps) {
-  const rows: [string, string][] = [
+function buildLabelRows(catalogItem: ProductCatalogItem | null, batch: Batch, size: string, qrId: string): [string, string][] {
+  return [
     ['QR ID', qrId],
     ['Product Name', batch.product],
     ['Item Code', catalogItem?.itemCode || '—'],
@@ -514,6 +431,10 @@ function LabelInfoRows({ catalogItem, batch, size, qrId }: LabelInfoRowsProps) {
     ['Website', catalogItem?.website || COMPANY_INFO.website],
     ['Helpline', catalogItem?.helpline || COMPANY_INFO.helpline],
   ];
+}
+
+function LabelInfoRows({ catalogItem, batch, size, qrId }: LabelInfoRowsProps) {
+  const rows = buildLabelRows(catalogItem, batch, size, qrId);
   return (
     <div className="text-[10px] leading-snug w-full">
       {rows.map(([k, v]) => (
@@ -531,7 +452,6 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
   const [individualFor, setIndividualFor] = useState<string | null>(null);
   const [labelKey, setLabelKey] = useState(DEFAULT_THERMAL_LABEL_KEY);
   const labelSize = THERMAL_LABEL_PRESETS.find((p) => p.key === labelKey) || THERMAL_LABEL_PRESETS[0];
-  useThermalPageSize(labelSize, data.mode === 'multi' ? 1 : 0);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 print:static print:bg-transparent print:block print:p-0">
@@ -541,7 +461,24 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
             {data.batch.id} — {items.length} {data.mode === 'multi' ? 'carton' : 'unit'} labels
           </h3>
           <div className="flex gap-2">
-            <Button variant="blue" onClick={() => window.print()}>Print</Button>
+            <Button
+              variant="blue"
+              onClick={() =>
+                printThermalLabels(
+                  items.map((it) => {
+                    const id = 'id' in it ? it.id : it.qr;
+                    return {
+                      qrValue: verifyUrl(it.qrString),
+                      rows: buildLabelRows(catalogItem, data.batch, data.batch.size, id),
+                      footer: data.mode === 'multi' && 'unitsCount' in it ? `${it.unitsCount} units in this carton` : undefined,
+                    };
+                  }),
+                  labelSize
+                )
+              }
+            >
+              Print
+            </Button>
             <LinkButton onClick={onClose}>Close</LinkButton>
           </div>
         </div>
@@ -611,7 +548,6 @@ function IndividualQrModal({ cartonId, catalogItem, batch, initialLabelKey, onCl
   const [units, setUnits] = useState<Product[] | null>(null);
   const [labelKey, setLabelKey] = useState(initialLabelKey || DEFAULT_THERMAL_LABEL_KEY);
   const labelSize = THERMAL_LABEL_PRESETS.find((p) => p.key === labelKey) || THERMAL_LABEL_PRESETS[0];
-  useThermalPageSize(labelSize, 1);
 
   useEffect(() => {
     api.getCartonUnits(cartonId).then((data) => setUnits(data.items));
@@ -623,7 +559,23 @@ function IndividualQrModal({ cartonId, catalogItem, batch, initialLabelKey, onCl
         <div className="flex justify-between items-center mb-4 no-print">
           <h3 className="text-lg m-0">{cartonId} — Individual Unit QRs</h3>
           <div className="flex gap-2">
-            <Button variant="blue" onClick={() => window.print()}>Print</Button>
+            <Button
+              variant="blue"
+              disabled={!units}
+              onClick={() =>
+                units &&
+                printThermalLabels(
+                  units.map((u) => ({
+                    qrValue: verifyUrl(u.qrString),
+                    rows: buildLabelRows(catalogItem, batch, u.size, u.qr),
+                    footer: `Status: ${u.active ? 'Activated' : 'Not yet activated'}`,
+                  })),
+                  labelSize
+                )
+              }
+            >
+              Print
+            </Button>
             <LinkButton onClick={onClose}>Close</LinkButton>
           </div>
         </div>
