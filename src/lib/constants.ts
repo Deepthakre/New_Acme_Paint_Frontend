@@ -103,9 +103,16 @@ export interface ThermalLabelPreset {
   label: string;
   width: number;
   height: number;
+  /** Default rotation of the printed content on this label (see printLabels.tsx). */
+  rotation?: 0 | 90 | 270;
 }
 
 export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
+  // Portrait 75x100 roll (label is 75mm across the printer, 100mm along the feed).
+  // The label is designed LANDSCAPE (QR left, details right, text running along
+  // the 100mm side) and rotated onto the portrait page, so it reads horizontally
+  // once the label is turned sideways. This is the default.
+  { key: '75x100h', label: '75mm × 100mm label — horizontal print (QR left, details right)', width: 100, height: 75, rotation: 90 },
   // Landscape (wide) rolls: QR on the left, all details on the right, so the
   // whole label is used. width >= height => row layout in useThermalPageSize.
   { key: '100x75', label: '100mm × 75mm (landscape) — QR left, details right', width: 100, height: 75 },
@@ -116,7 +123,7 @@ export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
   // Sold/labelled as "150mm x 100mm" — loaded as 100mm width x 150mm length.
   { key: '100x150', label: '100mm × 150mm (your "150×100" roll)', width: 100, height: 150 },
 ];
-export const DEFAULT_THERMAL_LABEL_KEY = '100x75';
+export const DEFAULT_THERMAL_LABEL_KEY = '75x100h';
 
 export const SIZE_OPTIONS = ['20L', '10L', '4L', '1L'];
 export const UNIT_OPTIONS = ['L', 'KG', 'Pcs'];

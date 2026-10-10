@@ -409,18 +409,26 @@ type LabelRotation = 0 | 90 | 270;
 // size typed in mm) plus an optional rotation for printers that print sideways.
 function useLabelPaper() {
   const [key, setKey] = useState(DEFAULT_THERMAL_LABEL_KEY);
-  const [rotation, setRotation] = useState<LabelRotation>(0);
+  // null = "Auto": use the rotation built into the chosen label preset.
+  const [rotationOverride, setRotationOverride] = useState<LabelRotation | null>(null);
   const [customW, setCustomW] = useState('100');
   const [customH, setCustomH] = useState('75');
   const preset = THERMAL_LABEL_PRESETS.find((p) => p.key === key) || THERMAL_LABEL_PRESETS[0];
   const isCustom = key === 'custom';
+  const rotation: LabelRotation = rotationOverride ?? (isCustom ? 0 : preset.rotation ?? 0);
   const width = isCustom ? Math.max(20, Number(customW) || 100) : preset.width;
   const height = isCustom ? Math.max(20, Number(customH) || 75) : preset.height;
   const paper = { width, height, rotation };
   const controls = (
     <div className="flex flex-wrap items-end gap-3">
       <Field label="Label size (roll in printer)">
-        <Select value={key} onChange={(e) => setKey(e.target.value)}>
+        <Select
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value);
+            setRotationOverride(null);
+          }}
+        >
           {THERMAL_LABEL_PRESETS.map((p) => (
             <option key={p.key} value={p.key}>{p.label}</option>
           ))}
@@ -437,9 +445,13 @@ function useLabelPaper() {
           </Field>
         </>
       )}
-      <Field label="Rotate print (if label comes out sideways)">
-        <Select value={String(rotation)} onChange={(e) => setRotation(Number(e.target.value) as LabelRotation)}>
-          <option value="0">Normal (no rotation)</option>
+      <Field label="Rotate print (only if it comes out the wrong way)">
+        <Select
+          value={rotationOverride === null ? 'auto' : String(rotationOverride)}
+          onChange={(e) => setRotationOverride(e.target.value === 'auto' ? null : (Number(e.target.value) as LabelRotation))}
+        >
+          <option value="auto">Auto (recommended)</option>
+          <option value="0">No rotation</option>
           <option value="90">Rotate 90° right</option>
           <option value="270">Rotate 90° left</option>
         </Select>
@@ -524,15 +536,36 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
             >
               Print
             </Button>
+            <Button
+              variant="blue"
+              onClick={() => {
+                const it = items[0];
+                if (!it) return;
+                const id = 'id' in it ? it.id : it.qr;
+                printThermalLabels(
+                  [
+                    {
+                      qrValue: verifyUrl(it.qrString),
+                      rows: buildLabelRows(catalogItem, data.batch, data.batch.size, id),
+                      footer: data.mode === 'multi' && 'unitsCount' in it ? `${it.unitsCount} units in this carton` : undefined,
+                    },
+                  ],
+                  labelSize
+                );
+              }}
+            >
+              Test print (1 label)
+            </Button>
             <LinkButton onClick={onClose}>Close</LinkButton>
           </div>
         </div>
         <div className="mb-3 no-print">
           {paperControls}
           <p className="text-xs text-ink-soft mt-2">
-            QR and all details print together on ONE label ({labelSize.width}mm x {labelSize.height}mm). In the print
-            dialog set Paper size = same label size, Margins = None, Scale = 100%. If the label comes out sideways or
-            text is cut, use "Rotate print" or type your roll's exact size under Custom size.
+            QR and all details print together on ONE label. In the print dialog set Paper size = your label size
+            (75 x 100 mm for the default), Margins = None, Scale = 100%. Use "Test print (1 label)" first. If text
+            reads upside-down, set Rotate print to the other direction; if it is cut, type your roll's exact size
+            under Custom size.
           </p>
         </div>
         <div className="print-area thermal-label-sheet grid grid-cols-2 gap-4">

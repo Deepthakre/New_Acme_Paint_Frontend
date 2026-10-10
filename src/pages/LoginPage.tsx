@@ -86,7 +86,7 @@ export default function LoginPage() {
           <div className="login-brand-row">
             <div className="login-brand-mark"><IconDroplet className="w-6 h-6" strokeWidth={2} /></div>
             <div>
-              <div className="login-brand-name">Acme<span>Paint(Version3)</span></div>
+              <div className="login-brand-name">Acme<span>Paint(Version4)</span></div>
               <div className="login-brand-sub">Manufacturing Excellence</div>
             </div>
           </div>
