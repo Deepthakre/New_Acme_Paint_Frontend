@@ -108,11 +108,13 @@ export interface ThermalLabelPreset {
 }
 
 export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
-  // Portrait 75x100 roll (label is 75mm across the printer, 100mm along the feed).
-  // The label is designed LANDSCAPE (QR left, details right, text running along
-  // the 100mm side) and rotated onto the portrait page, so it reads horizontally
-  // once the label is turned sideways. This is the default.
-  { key: '75x100h', label: '75mm × 100mm label — horizontal print (QR left, details right)', width: 100, height: 75, rotation: 90 },
+  // The roll in use is 4 x 6 inch (100 x 150 mm; Chrome shows it as "4 x 6", TSC TTP-244 Pro).
+  // The label is designed LANDSCAPE (6 x 4 in): QR on the left, aligned key : value list on
+  // the right, filling the whole label. Recommended: Chrome shows it upright in the preview.
+  { key: '4x6-landscape', label: '4 × 6 inch label (100×150 mm) — landscape, QR left + details right (recommended)', width: 152.4, height: 101.6 },
+  // Same design, but drawn rotated onto a portrait 4 x 6 page. Use ONLY if the option above
+  // comes out sideways or cut because the printer driver does not rotate landscape pages.
+  { key: '4x6-rotated', label: '4 × 6 inch label — portrait page, content rotated (only if the option above prints wrong)', width: 152.4, height: 101.6, rotation: 90 },
   // Landscape (wide) rolls: QR on the left, all details on the right, so the
   // whole label is used. width >= height => row layout in useThermalPageSize.
   { key: '100x75', label: '100mm × 75mm (landscape) — QR left, details right', width: 100, height: 75 },
@@ -123,7 +125,7 @@ export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
   // Sold/labelled as "150mm x 100mm" — loaded as 100mm width x 150mm length.
   { key: '100x150', label: '100mm × 150mm (your "150×100" roll)', width: 100, height: 150 },
 ];
-export const DEFAULT_THERMAL_LABEL_KEY = '75x100h';
+export const DEFAULT_THERMAL_LABEL_KEY = '4x6-landscape';
 
 export const SIZE_OPTIONS = ['20L', '10L', '4L', '1L'];
 export const UNIT_OPTIONS = ['L', 'KG', 'Pcs'];

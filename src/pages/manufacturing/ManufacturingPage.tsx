@@ -562,10 +562,10 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
         <div className="mb-3 no-print">
           {paperControls}
           <p className="text-xs text-ink-soft mt-2">
-            QR and all details print together on ONE label. In the print dialog set Paper size = your label size
-            (75 x 100 mm for the default), Margins = None, Scale = 100%. Use "Test print (1 label)" first. If text
-            reads upside-down, set Rotate print to the other direction; if it is cut, type your roll's exact size
-            under Custom size.
+            QR and all details print together on ONE label. In the Chrome print dialog set: Paper size = 4 x 6,
+            Margins = None, Scale = Default (100%, not 80). Do "Test print (1 label)" first. If the label comes out
+            sideways or cut, choose the "content rotated" size above (or change "Rotate print"); if the size is
+            different from 4 x 6, type it under Custom size.
           </p>
         </div>
         <div className="print-area thermal-label-sheet grid grid-cols-2 gap-4">
