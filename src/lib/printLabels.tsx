@@ -96,7 +96,7 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
     .label {
       position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: ${transform};
       width: ${cw}mm; height: ${ch}mm; padding: ${padY}mm ${padX}mm;
-      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: ${isLandscape ? 'center' : 'flex-start'}; gap: ${gap}mm;
+      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: flex-start; gap: ${gap}mm;
       overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000;
     }
     .qr { flex: 0 0 auto; width: ${qr}mm; height: ${qr}mm; }
