@@ -125,7 +125,7 @@ export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
   // Sold/labelled as "150mm x 100mm" — loaded as 100mm width x 150mm length.
   { key: '100x150', label: '100mm × 150mm (your "150×100" roll)', width: 100, height: 150 },
 ];
-export const DEFAULT_THERMAL_LABEL_KEY = '4x6-landscape';
+export const DEFAULT_THERMAL_LABEL_KEY = '100x75';
 
 export const SIZE_OPTIONS = ['20L', '10L', '4L', '1L'];
 export const UNIT_OPTIONS = ['L', 'KG', 'Pcs'];
