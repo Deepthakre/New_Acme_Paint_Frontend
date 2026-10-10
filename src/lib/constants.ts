@@ -106,12 +106,17 @@ export interface ThermalLabelPreset {
 }
 
 export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
+  // Landscape (wide) rolls: QR on the left, all details on the right, so the
+  // whole label is used. width >= height => row layout in useThermalPageSize.
+  { key: '100x75', label: '100mm × 75mm (landscape) — QR left, details right', width: 100, height: 75 },
+  { key: '100x50', label: '100mm × 50mm (landscape) — QR left, details right', width: 100, height: 50 },
+  { key: '75x50', label: '75mm × 50mm (landscape) — QR left, details right', width: 75, height: 50 },
   { key: '50x100', label: '50mm × 100mm', width: 50, height: 100 },
   { key: '75x100', label: '75mm × 100mm', width: 75, height: 100 },
   // Sold/labelled as "150mm x 100mm" — loaded as 100mm width x 150mm length.
   { key: '100x150', label: '100mm × 150mm (your "150×100" roll)', width: 100, height: 150 },
 ];
-export const DEFAULT_THERMAL_LABEL_KEY = '75x100';
+export const DEFAULT_THERMAL_LABEL_KEY = '100x75';
 
 export const SIZE_OPTIONS = ['20L', '10L', '4L', '1L'];
 export const UNIT_OPTIONS = ['L', 'KG', 'Pcs'];

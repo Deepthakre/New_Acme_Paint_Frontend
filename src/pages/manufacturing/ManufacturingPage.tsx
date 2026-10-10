@@ -554,10 +554,10 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
             </Select>
           </Field>
           <p className="text-xs text-ink-soft flex-1 min-w-[240px]">
-            Printing on a {labelSize.width}mm x {labelSize.height}mm label — the detail text below is
-            shown here for you to verify, but only the QR is sent to the printer (there isn't room for
-            readable text at this size). Before printing: in the Chrome print dialog set Margins to
-            "None" and Scale to "Default/100%" — otherwise the printer driver will scale or crop it.
+            Printing on a {labelSize.width}mm x {labelSize.height}mm label — QR and all details are
+            printed together on the same label. Before printing: pick the SAME size as paper size in
+            the printer dialog/driver (it must match the roll, landscape), set Margins to "None" and
+            Scale to "Default/100%" — otherwise the printer will split one label across two.
           </p>
         </div>
         <div className="print-area thermal-label-sheet grid grid-cols-2 gap-4">
