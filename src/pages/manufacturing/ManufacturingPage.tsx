@@ -562,7 +562,7 @@ function LabelSheet({ data, catalogItem, onClose }: { data: BatchLabels; catalog
         <div className="mb-3 no-print">
           {paperControls}
           <p className="text-xs text-ink-soft mt-2">
-            QR and all details print together on ONE label. In the Chrome print dialog set: Paper size = 4 x 6,
+            QR and all details print together on ONE label. In the Chrome print dialog set: Paper size = 75 x 100 mm,
             Margins = None, Scale = Default (100%, not 80). Do "Test print (1 label)" first. The label prints with the QR
             at the top and the details running down. If it comes out upside-down, set "Rotate print" to "Rotate 90° left";
             if the size is different from 4 x 6, type it under Custom size.

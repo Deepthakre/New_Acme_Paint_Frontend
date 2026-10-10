@@ -108,6 +108,11 @@ export interface ThermalLabelPreset {
 }
 
 export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
+  // 75 x 100 mm roll (75 mm across the head, 100 mm along the feed). The design is landscape
+  // (100 x 75: QR on the left, key : value list on the right) and is printed ROTATED 90° onto the
+  // portrait 75 x 100 page, so nothing is clipped. On the sticker: QR at the top, text reading
+  // top-to-bottom. If it comes out upside-down use "Rotate print" -> "Rotate 90° left".
+  { key: '75x100-rotated', label: '75 × 100 mm label — QR top, details running down (recommended)', width: 100, height: 75, rotation: 90 },
   // The roll in use is 4 x 6 inch (100 x 150 mm, TSC TTP-244 Pro). The print head is only ~100 mm
   // wide, so a landscape (152 mm wide) page gets CUT on the right. The label is therefore designed
   // landscape (QR on the left, aligned key : value list on the right) but printed ROTATED 90° onto
@@ -128,7 +133,7 @@ export const THERMAL_LABEL_PRESETS: ThermalLabelPreset[] = [
   // Sold/labelled as "150mm x 100mm" — loaded as 100mm width x 150mm length.
   { key: '100x150', label: '100mm × 150mm (your "150×100" roll)', width: 100, height: 150 },
 ];
-export const DEFAULT_THERMAL_LABEL_KEY = '4x6-rotated';
+export const DEFAULT_THERMAL_LABEL_KEY = '75x100-rotated';
 
 export const SIZE_OPTIONS = ['20L', '10L', '4L', '1L'];
 export const UNIT_OPTIONS = ['L', 'KG', 'Pcs'];
