@@ -26,6 +26,11 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// One place for the starting font size (px); the text then shrinks until all rows fit.
+function startFontFor(width: number): number {
+  return width >= 140 ? 14 : 12;
+}
+
 /**
  * Prints each label as EXACTLY ONE physical label.
  *
@@ -36,6 +41,9 @@ function esc(s: string): string {
  * the real label so rounding can never push it onto a second page), the QR is
  * small, and the text font is shrunk automatically until ALL rows fit inside
  * the box — so nothing is ever cut off and nothing flows to another label.
+ *
+ * Look: QR on the left (vertically centred), then "Key: value" lines on the
+ * right — bold key, normal value, long values wrap to the next line.
  */
 export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): string {
   const { width, height } = paper;
@@ -52,20 +60,14 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
   const pdH = pageH - 0.6; // page <div> is also slightly shorter than the page
   const big = width >= 140; // 4 x 6 inch class label: more room, so larger text and padding
   const padX = big ? 5 : 2.5;
-const padY = big ? 4 : 2.5;
-const gap = big ? 4 : 2;
+  const padY = big ? 4 : 2.5;
+  const gap = big ? 4 : 2;
   // Small but still easy to scan (never below 22mm); the text shrinks to fit.
   const qr = isLandscape
-  ? Math.max(
-      22,
-      Math.min(
-        ch - 2 * padY,
-        Math.round(width * (big ? 0.22 : 0.26))
-      )
-    )
-  : Math.max(22, Math.min(cw - 2 * padX, Math.round(height * 0.26)));
+    ? Math.max(22, Math.min(ch - 2 * padY, Math.round(width * (big ? 0.22 : 0.26))))
+    : Math.max(22, Math.min(cw - 2 * padX, Math.round(height * 0.26)));
   const infoH = isLandscape ? ch - 2 * padY : ch - 2 * padY - qr - gap;
- const startFont = big ? 14 : 9.5;
+  const startFont = startFontFor(width);
   const transform =
     rotation === 90 ? `translateX(${ch}mm) rotate(90deg)` : rotation === 270 ? `translateY(${cw}mm) rotate(-90deg)` : 'none';
 
@@ -74,7 +76,9 @@ const gap = big ? 4 : 2;
       const svg = renderToStaticMarkup(
         <QRCodeSVG value={l.qrValue} size={256} level="M" includeMargin={true} />
       );
-      const rows = l.rows.map(([k, v]) => `<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>`).join('');
+      const rows = l.rows
+        .map(([k, v]) => `<div class="row"><span class="k">${esc(k)}:</span> <span class="v">${esc(v)}</span></div>`)
+        .join('');
       const footer = l.footer ? `<div class="foot">${esc(l.footer)}</div>` : '';
       return `<div class="page"><div class="label"><div class="qr">${svg}</div><div class="info">${rows}${footer}</div></div></div>`;
     })
@@ -92,21 +96,20 @@ const gap = big ? 4 : 2;
     .label {
       position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: ${transform};
       width: ${cw}mm; height: ${ch}mm; padding: ${padY}mm ${padX}mm;
-      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: flex-start; gap: ${gap}mm;
+      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: ${isLandscape ? 'center' : 'flex-start'}; gap: ${gap}mm;
       overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000;
     }
     .qr { flex: 0 0 auto; width: ${qr}mm; height: ${qr}mm; }
     .qr svg { width: ${qr}mm; height: ${qr}mm; display: block; }
-    /* Aligned "Key : value" list: keys in one column, values in the next. */
+    /* "Key: value" lines: bold key, normal value, long values wrap. */
     .info {
       flex: 1 1 auto; min-width: 0; width: 100%; height: ${infoH}mm; overflow: hidden;
-      display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 1.5mm; row-gap: 0.45mm;
-      align-content: start; line-height: 1.12; font-size: ${startFont}px;
+      line-height: 1.15; font-size: ${startFont}px;
     }
-    .k { font-weight: 700; white-space: nowrap; }
-    .k::after { content: " :"; }
-    .v { overflow-wrap: anywhere; }
-    .foot { grid-column: 1 / -1; margin-top: 1mm; padding-top: 0.8mm; border-top: 0.2mm solid #000; }
+    .row { margin: 0 0 0.5mm 0; overflow-wrap: anywhere; }
+    .k { font-weight: 700; }
+    .v { font-weight: 400; }
+    .foot { margin-top: 1mm; padding-top: 0.8mm; border-top: 0.2mm solid #000; }
   </style></head><body>${body}</body></html>`;
 
   return html;
@@ -115,7 +118,7 @@ const gap = big ? 4 : 2;
 export function printThermalLabels(labels: PrintableLabel[], paper: LabelPaper): void {
   if (labels.length === 0) return;
   const html = buildLabelsHtml(labels, paper);
-const startFont = paper.width >= 140 ? 14 : 9.5;
+  const startFont = startFontFor(paper.width);
 
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
