@@ -49,7 +49,6 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
   const { width, height } = paper;
   const rotation = paper.rotation ?? 0;
   const rotated = rotation !== 0;
-  const isLandscape = width >= height;
   // Content box: always a little smaller than the real label so rounding can
   // never push one label onto a second page.
   const cw = rotated ? width - 0.6 : width;
@@ -63,10 +62,11 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
   const padY = big ? 4 : 2.5;
   const gap = big ? 4 : 2;
   // Small but still easy to scan (never below 22mm); the text shrinks to fit.
-  const qr = isLandscape
-    ? Math.max(22, Math.min(ch - 2 * padY, Math.round(width * (big ? 0.22 : 0.26))))
-    : Math.max(22, Math.min(cw - 2 * padX, Math.round(height * 0.26)));
-  const infoH = isLandscape ? ch - 2 * padY : ch - 2 * padY - qr - gap;
+  const qr = Math.min(
+    Math.max(22, Math.round(cw * (big ? 0.22 : 0.26))),
+    cw - 2 * padX - gap
+  );
+  const infoH = ch - 2 * padY;
   const startFont = startFontFor(width);
   const transform =
     rotation === 90 ? `translateX(${ch}mm) rotate(90deg)` : rotation === 270 ? `translateY(${cw}mm) rotate(-90deg)` : 'none';
@@ -96,14 +96,15 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
     .label {
       position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: ${transform};
       width: ${cw}mm; height: ${ch}mm; padding: ${padY}mm ${padX}mm;
-      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: flex-start; gap: ${gap}mm;
+      display: grid; grid-template-columns: ${qr}mm minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+      align-items: start; column-gap: ${gap}mm;
       overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000;
     }
-    .qr { flex: 0 0 auto; width: ${qr}mm; height: ${qr}mm; }
-    .qr svg { width: ${qr}mm; height: ${qr}mm; display: block; }
+    .qr { align-self: start; width: ${qr}mm; height: ${qr}mm; display: flex; align-items: center; justify-content: center; }
+    .qr svg { width: ${qr}mm; height: ${qr}mm; display: block; flex: none; }
     /* "Key: value" lines: bold key, normal value, long values wrap. */
     .info {
-      flex: 1 1 auto; min-width: 0; width: 100%; height: ${infoH}mm; overflow: hidden;
+      min-width: 0; min-height: 0; width: 100%; height: ${infoH}mm; overflow: hidden;
       line-height: 1.15; font-size: ${startFont}px;
     }
     .row { margin: 0 0 0.5mm 0; overflow-wrap: anywhere; }
