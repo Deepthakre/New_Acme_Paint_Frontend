@@ -246,14 +246,18 @@ input[aria-invalid='true'],select[aria-invalid='true'],input[aria-invalid='true'
   .print-area,.print-area * { visibility:visible; }
   .print-area { position:absolute;inset:0;background:#fff;padding:20px; }
   .no-print { display:none!important; }
-  .print-area.thermal-label-sheet { padding:0;display:block; }
-  .print-area.thermal-label-sheet .thermal-label {
-    box-sizing:border-box;width:25mm;height:25mm;margin:0;padding:.5mm;border:none;border-radius:0;
-    display:flex;align-items:center;justify-content:flex-start;overflow:hidden;page-break-after:always;break-after:page;
+  .print-area.thermal-label-sheet {
+    padding:5mm 0 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4mm;align-content:start;
   }
-  .print-area.thermal-label-sheet .thermal-label:last-child { page-break-after:auto;break-after:auto; }
-  .print-area.thermal-label-sheet .thermal-label .label-info { display:none; }
-  .print-area.thermal-label-sheet .thermal-label svg { width:23mm!important;height:23mm!important; }
+  .print-area.thermal-label-sheet .thermal-label {
+    box-sizing:border-box;width:auto;height:75mm;margin:0;padding:3mm;border:none;border-radius:0;
+    display:flex;flex-direction:row;align-items:flex-start;justify-content:flex-start;gap:3mm;overflow:hidden;
+    page-break-inside:avoid;break-inside:avoid;
+  }
+  .print-area.thermal-label-sheet .thermal-label .label-info { display:block;flex:1 1 0%;min-width:0;overflow:hidden; }
+  .print-area.thermal-label-sheet .thermal-label svg {
+    width:22mm!important;height:22mm!important;flex:0 0 22mm;align-self:flex-start;
+  }
 }
 
 
