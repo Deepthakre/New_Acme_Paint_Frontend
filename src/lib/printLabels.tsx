@@ -35,18 +35,49 @@ function startFontFor(width: number, height: number): number {
   return 8;
 }
 
+function renderProductLabel(label: PrintableLabel, qrMarkup: string): string {
+  const entries = label.rows.flatMap(([key, value, pairedKey, pairedValue]) => [
+    { key, value },
+    ...(pairedKey && pairedValue !== undefined ? [{ key: pairedKey, value: pairedValue }] : []),
+  ]);
+  const company = entries.find((entry) => entry.key === 'Manufactured By');
+  const footerKeys = new Set(['Manufactured By', 'Address', 'Email', 'Website', 'Helpline']);
+  const details = entries.filter((entry) => !footerKeys.has(entry.key));
+  const address = entries.find((entry) => entry.key === 'Address');
+  const contactEntries = entries.filter((entry) => ['Email', 'Website', 'Helpline'].includes(entry.key));
+  const detailMarkup = details.map(({ key, value }) =>
+    `<div class="product-detail${key === 'Product Name' ? ' product-name' : ''}${key === 'QR ID' ? ' product-qr-id' : ''}"><span class="k">${esc(key)}:</span> <span class="v">${esc(value)}</span></div>`
+  ).join('');
+  const contactMarkup = contactEntries.map(({ key, value }) =>
+    `<span class="product-contact"><strong>${esc(key)}:</strong> ${esc(value)}</span>`
+  ).join('');
+  const note = label.footer ? `<div class="product-note">${esc(label.footer)}</div>` : '';
+
+  return `<div class="product-label">
+    <header class="product-header">${esc(company?.value || 'Product Information')}</header>
+    <div class="product-main"><div class="product-qr">${qrMarkup}</div><div class="product-details">${detailMarkup}</div></div>
+    <footer class="product-footer">
+      ${company ? `<span class="product-contact"><strong>Manufactured By:</strong> ${esc(company.value)}</span>` : ''}
+      ${address ? `<div class="product-address"><strong>Address:</strong> ${esc(address.value)}</div>` : ''}
+      <div class="product-contacts">${contactMarkup}</div>
+      ${note}
+    </footer>
+  </div>`;
+}
+
 export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): string {
   const { width, height } = paper;
   const pageWidth = paper.columns === 2 ? paper.rollWidth : width;
   const isCompactSquare = width === 50 && height === 50;
   const isLargeSquare = width === 100 && height === 100;
+  const isProductLabel = width === 100 && height === 70;
   const isLandscape = width > height;
   const rotateDesign = paper.rotate && width === 100 && height === 70;
-  const padding = isCompactSquare ? 1 : 2;
+  const padding = isCompactSquare ? 1 : isProductLabel ? 1.5 : 2;
   const padX = padding;
   const padY = padding;
   const gap = isCompactSquare ? 1 : 2;
-  const qr = isCompactSquare ? 13 : isLargeSquare ? 28 : width === 100 ? 25 : 18;
+  const qr = isCompactSquare ? 13 : isLargeSquare ? 28 : isProductLabel ? 28 : width === 100 ? 25 : 18;
   const infoH = isLandscape ? height - 2 * padY : height - 2 * padY - qr - gap;
   const startFont = startFontFor(width, height);
 
@@ -55,6 +86,13 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
       const svg = renderToStaticMarkup(
         <QRCodeSVG value={l.qrValue} size={256} level="M" includeMargin={true} />
       );
+      if (isProductLabel) {
+        const productLabel = renderProductLabel(l, `<div class="qr">${svg}</div>`);
+        const contents = rotateDesign
+          ? `<div class="rotated-content product-rotated-content">${productLabel}</div>`
+          : productLabel;
+        return `<section class="label product-label-section${rotateDesign ? ' rotated-label' : ''}">${contents}</section>`;
+      }
       const rowMarkup = l.rows
         .map(([k, v, pairedKey, pairedValue]) => {
           const row = `<div class="row"><span class="k">${esc(k)}:</span> <span class="v">${esc(v)}</span></div>`;
@@ -107,6 +145,37 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
       transform-origin:center;
     }
     .rotated-content .info { width:auto; height:auto; flex:1; }
+    .product-label-section { display:block; padding:0; }
+    .product-label {
+      width:100%; height:100%; display:flex; flex-direction:column; gap:.5mm;
+      padding:${padY}mm ${padX}mm; overflow:hidden; font-family:Arial, Helvetica, sans-serif;
+    }
+    .product-header {
+      text-align: center;
+      flex:0 0 auto; padding:0 0 10px; border-bottom:.45mm solid #111;
+      font-size:15px; line-height:1.1; font-weight:800; letter-spacing:.15px;
+      text-transform:uppercase; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+    }
+    .product-main { margin: 10px 0px;min-height:0; flex:0 0 auto; display:flex; align-items:center; gap:3mm; }
+    .product-qr { flex:0 0 ${qr}mm; width:${qr}mm; height:${qr}mm; }
+    .product-qr svg { display:block; width:100%; height:100%; }
+    .product-details {
+      min-width:0; flex:1 1 auto; overflow:hidden; font-size:10px; line-height:1.22;
+    }
+    .product-detail { margin:0 0 .7mm; overflow-wrap:anywhere; }
+    .product-name { font-size:12px; line-height:1.15; font-weight:700; margin-bottom:1mm; }
+    .product-qr-id { font-size:9px; font-weight:700; }
+    .product-footer {
+      flex:0 0 auto; padding-top:10px; border-top:.35mm solid #111;
+      overflow:hidden; font-size:9px !important; line-height:1.2;
+    }
+    .product-address { margin-top:.4mm; overflow-wrap:anywhere; }
+    .product-contacts { display:flex; flex-wrap:wrap; column-gap:2mm; row-gap:.3mm; }
+    .product-contact { overflow-wrap:anywhere; }
+    .product-note { margin-top:.4mm; font-weight:700; }
+    .product-rotated-content {
+      width:${height}mm; height:${width}mm; display:block; padding:0;
+    }
     .compact-square .qr { margin:.3mm 0; }
     .compact-square .info { font-size:6.67px; line-height:1; }
     .large-square .qr { margin:1mm 0; }
@@ -127,10 +196,12 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
 }
 
 export function fitLabelText(doc: Document, width: number, height: number): void {
-  doc.querySelectorAll<HTMLElement>('.info').forEach((el) => {
-    let size = startFontFor(width, height);
+  doc.querySelectorAll<HTMLElement>('.info, .product-details, .product-footer').forEach((el) => {
+    const baseSize = Number.parseFloat(doc.defaultView?.getComputedStyle(el).fontSize || '');
+    let size = Number.isFinite(baseSize) ? baseSize : startFontFor(width, height);
     el.style.fontSize = `${size}px`;
-    while (el.scrollHeight > el.clientHeight + 0.5 && size > (width <= 50 ? 3.5 : 3)) {
+    const minimumSize = el.classList.contains('product-footer') ? 6 : width <= 50 ? 3.5 : 3;
+    while (el.scrollHeight > el.clientHeight + 0.5 && size > minimumSize) {
       size -= 0.25;
       el.style.fontSize = `${size}px`;
     }
