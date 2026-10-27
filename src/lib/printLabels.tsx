@@ -1,0 +1,172 @@
+import { renderToStaticMarkup } from 'react-dom/server';
+import { QRCodeSVG } from 'qrcode.react';
+
+export interface PrintableLabel {
+  /** Exact string to encode in the QR. */
+  qrValue: string;
+  /** Key/value detail rows, printed in this order. */
+  rows: [string, string, string?, string?][];
+  /** Optional extra line at the bottom. */
+  footer?: string;
+}
+
+export interface LabelPaper {
+  /** Label width in mm (side across the roll). */
+  width: number;
+  /** Label height in mm (side along the roll). */
+  height: number;
+  /** Number of labels printed side by side on each roll row. */
+  columns: 1 | 2;
+  /** Usable roll width in mm; used when printing two labels across. */
+  rollWidth: number;
+  /** Rotates the complete 100 x 70 mm design. */
+  rotate: boolean;
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Starting font size in px; the print document reduces it if the rows overflow.
+function startFontFor(width: number): number {
+  if (width <= 50) return 6.67;
+  return 8;
+}
+
+export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): string {
+  const { width, height } = paper;
+  const pageWidth = paper.columns === 2 ? paper.rollWidth : width;
+  const isCompactSquare = width === 50 && height === 50;
+  const isLargeSquare = width === 100 && height === 100;
+  const isLandscape = width > height;
+  const rotateDesign = paper.rotate && width === 100 && height === 70;
+  const padding = isCompactSquare ? 1 : 2;
+  const padX = padding;
+  const padY = padding;
+  const gap = isCompactSquare ? 1 : 2;
+  const qr = isCompactSquare
+    ? 13
+    : rotateDesign
+    ? 22
+    : isLandscape
+    ? 18
+    : 18;
+  const infoH = isLandscape ? height - 2 * padY : height - 2 * padY - qr - gap;
+  const startFont = startFontFor(width);
+
+  const labelMarkup = labels
+    .map((l) => {
+      const svg = renderToStaticMarkup(
+        <QRCodeSVG value={l.qrValue} size={256} level="M" includeMargin={true} />
+      );
+      const rowMarkup = l.rows
+        .map(([k, v, pairedKey, pairedValue]) => {
+          const row = `<div class="row"><span class="k">${esc(k)}:</span> <span class="v">${esc(v)}</span></div>`;
+          const pairedRow = pairedKey && pairedValue !== undefined
+            ? `<div class="row"><span class="k">${esc(pairedKey)}:</span> <span class="v">${esc(pairedValue)}</span></div>`
+            : '';
+          return row + pairedRow;
+        });
+      const rows = rowMarkup.join('');
+      const footer = l.footer ? `<div class="foot">${esc(l.footer)}</div>` : '';
+      const labelContent = `<div class="qr">${svg}</div><div class="info">${rows}${footer}</div>`;
+      const contents = rotateDesign
+        ? `<div class="rotated-content">${labelContent}</div>`
+        : labelContent;
+      return `<section class="label${isCompactSquare ? ' compact-square' : ''}${isLargeSquare ? ' large-square' : ''}${rotateDesign ? ' rotated-label' : ''}">${contents}</section>`;
+    });
+  const rows: string[] = [];
+  for (let index = 0; index < labels.length; index += paper.columns) {
+    rows.push(`<div class="label-row">${labelMarkup.slice(index, index + paper.columns).join('')}</div>`);
+  }
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Labels</title><style>
+    @page { size: ${pageWidth}mm ${height}mm; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .label-row {
+      width: ${pageWidth}mm; height: ${height}mm; display:grid;
+      grid-template-columns: repeat(${paper.columns}, ${width}mm); gap: 2mm;
+      justify-content: ${paper.columns === 2 ? 'center' : 'start'}; overflow:hidden;
+      page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid;
+    }
+    .label-row:last-child { page-break-after: auto; break-after: auto; }
+    .label {
+      position: relative; width: ${width}mm; height: ${height}mm; padding: ${padY}mm ${padX}mm;
+      display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: flex-start; gap: ${gap}mm;
+      overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .rotated-label { display:block; padding:0; }
+    .rotated-content {
+      position:absolute; top:50%; left:50%; width:${height}mm; height:${width}mm;
+      padding:${padY}mm ${padX}mm; overflow:hidden; display:flex; flex-direction:row;
+      align-items:center; gap:${gap}mm; transform:translate(-50%,-50%) rotate(90deg);
+      transform-origin:center;
+    }
+    .rotated-content .info { width:auto; height:auto; flex:1; }
+    .compact-square .qr { margin:.3mm 0; }
+    .compact-square .info { font-size:6.67px; line-height:1; }
+    .large-square .qr { margin:1mm 0; }
+    .large-square .info { font-size:8px; line-height:1.08; }
+    .qr { flex: 0 0 auto; width: ${qr}mm; height: ${qr}mm; }
+    .qr svg { width: ${qr}mm; height: ${qr}mm; display: block; }
+    .info {
+      flex: 1 1 auto; min-width: 0; width: 100%; height: ${infoH}mm; overflow: hidden;
+      line-height: 1.08; font-size: ${startFont}px;
+    }
+    .row { margin: 0 0 .4mm 0; overflow-wrap: anywhere; }
+    .k { font-weight: 700; }
+    .v { font-weight: 400; }
+    .foot { margin-top: 1mm; padding-top: 0.8mm; border-top: 0.2mm solid #000; }
+  </style></head><body>${rows.join('')}</body></html>`;
+
+  return html;
+}
+
+export function fitLabelText(doc: Document, width: number): void {
+  doc.querySelectorAll<HTMLElement>('.info').forEach((el) => {
+    let size = startFontFor(width);
+    el.style.fontSize = `${size}px`;
+    while (el.scrollHeight > el.clientHeight + 0.5 && size > (width <= 50 ? 3.5 : 3)) {
+      size -= 0.25;
+      el.style.fontSize = `${size}px`;
+    }
+  });
+}
+
+export function printThermalLabels(labels: PrintableLabel[], paper: LabelPaper): void {
+  if (labels.length === 0) return;
+  if (
+    paper.columns === 2 &&
+    (paper.width * 2 + 2 > 108 || paper.rollWidth < paper.width * 2 + 2 || paper.rollWidth > 108)
+  ) {
+    window.alert(`Two-across printing needs a usable roll width from ${paper.width * 2 + 2} mm to 108 mm.`);
+    return;
+  }
+  const html = buildLabelsHtml(labels, paper);
+
+  const win = window.open('', '_blank', 'width=900,height=700');
+  if (!win) {
+    window.alert('Your browser blocked the print window. Allow pop-ups for this app and try again.');
+    return;
+  }
+
+  const doc = win.document;
+  win.addEventListener('afterprint', () => win.close(), { once: true });
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    fitLabelText(doc, paper.width);
+    win.focus();
+    win.print();
+  }, 150);
+}
