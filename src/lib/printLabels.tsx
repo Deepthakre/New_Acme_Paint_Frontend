@@ -28,8 +28,10 @@ function esc(s: string): string {
 }
 
 // Starting font size in px; the print document reduces it if the rows overflow.
-function startFontFor(width: number): number {
+function startFontFor(width: number, height: number): number {
   if (width <= 50) return 6.67;
+  if (width === 100 && height === 70) return 10;
+  if (width === 100 && height === 100) return 11.5;
   return 8;
 }
 
@@ -44,15 +46,9 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
   const padX = padding;
   const padY = padding;
   const gap = isCompactSquare ? 1 : 2;
-  const qr = isCompactSquare
-    ? 13
-    : rotateDesign
-    ? 22
-    : isLandscape
-    ? 18
-    : 18;
+  const qr = isCompactSquare ? 13 : isLargeSquare ? 28 : width === 100 ? 25 : 18;
   const infoH = isLandscape ? height - 2 * padY : height - 2 * padY - qr - gap;
-  const startFont = startFontFor(width);
+  const startFont = startFontFor(width, height);
 
   const labelMarkup = labels
     .map((l) => {
@@ -90,14 +86,14 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
       print-color-adjust: exact;
     }
     .label-row {
-      width: ${pageWidth}mm; height: ${height}mm; display:grid;
-      grid-template-columns: repeat(${paper.columns}, ${width}mm); gap: 2mm;
+      width: ${pageWidth}mm; height: ${height}mm; display:flex; flex-flow:row nowrap; gap: 2mm;
       justify-content: ${paper.columns === 2 ? 'center' : 'start'}; overflow:hidden;
       page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid;
     }
     .label-row:last-child { page-break-after: auto; break-after: auto; }
     .label {
       position: relative; width: ${width}mm; height: ${height}mm; padding: ${padY}mm ${padX}mm;
+      flex: 0 0 ${width}mm;
       display: flex; flex-direction: ${isLandscape ? 'row' : 'column'}; align-items: flex-start; gap: ${gap}mm;
       overflow: hidden; font-family: Arial, Helvetica, sans-serif; color: #000;
       -webkit-print-color-adjust: exact;
@@ -114,7 +110,7 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
     .compact-square .qr { margin:.3mm 0; }
     .compact-square .info { font-size:6.67px; line-height:1; }
     .large-square .qr { margin:1mm 0; }
-    .large-square .info { font-size:8px; line-height:1.08; }
+    .large-square .info { font-size:11.5px; line-height:1.1; }
     .qr { flex: 0 0 auto; width: ${qr}mm; height: ${qr}mm; }
     .qr svg { width: ${qr}mm; height: ${qr}mm; display: block; }
     .info {
@@ -130,9 +126,9 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
   return html;
 }
 
-export function fitLabelText(doc: Document, width: number): void {
+export function fitLabelText(doc: Document, width: number, height: number): void {
   doc.querySelectorAll<HTMLElement>('.info').forEach((el) => {
-    let size = startFontFor(width);
+    let size = startFontFor(width, height);
     el.style.fontSize = `${size}px`;
     while (el.scrollHeight > el.clientHeight + 0.5 && size > (width <= 50 ? 3.5 : 3)) {
       size -= 0.25;
@@ -165,7 +161,7 @@ export function printThermalLabels(labels: PrintableLabel[], paper: LabelPaper):
   doc.close();
 
   setTimeout(() => {
-    fitLabelText(doc, paper.width);
+    fitLabelText(doc, paper.width, paper.height);
     win.focus();
     win.print();
   }, 150);

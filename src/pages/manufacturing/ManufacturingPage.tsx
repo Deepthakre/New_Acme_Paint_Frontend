@@ -505,6 +505,7 @@ function useLabelPaper() {
               onClick={() => {
                 setWidthInput(String(preset.width));
                 setHeightInput(String(preset.height));
+                if (preset.key === '50x50') setColumns(2);
                 if (preset.width * 2 + 2 > 108) setColumns(1);
                 if (preset.key !== '100x70') setRotateDesign(false);
               }}
@@ -711,7 +712,7 @@ function LabelPrintPreview({ labels, paper }: { labels: PrintableLabel[]; paper:
             srcDoc={html}
             onLoad={(event) => {
               const doc = event.currentTarget.contentDocument;
-              if (doc) fitLabelText(doc, paper.width);
+              if (doc) fitLabelText(doc, paper.width, paper.height);
             }}
             style={{
               position: 'absolute',
