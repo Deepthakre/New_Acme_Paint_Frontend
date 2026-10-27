@@ -147,16 +147,16 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
     .rotated-content .info { width:auto; height:auto; flex:1; }
     .product-label-section { display:block; padding:0; }
     .product-label {
-      width:100%; height:100%; min-height:0; display:flex; flex-direction:column; gap:.5mm;
+      width:100%; height:100%; min-height:0; display:flex; flex-direction:column; gap:.2mm;
       padding:${padY}mm ${padX}mm; overflow:hidden; font-family:Arial, Helvetica, sans-serif;
     }
     .product-header {
       text-align: center;
-      flex:0 0 auto; padding:0 0 .4mm; border-bottom:.45mm solid #111;
+      flex:0 0 auto; padding:0; border-bottom:.45mm solid #111;
       font-size:15px; line-height:1.1; font-weight:800; letter-spacing:.15px;
       text-transform:uppercase; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
     }
-    .product-main { min-height:0; flex:1 1 0; display:flex; align-items:center; gap:3mm; overflow:hidden; }
+    .product-main { min-height:0; flex:0 0 auto; display:flex; align-items:flex-start; gap:3mm; overflow:hidden; }
     .product-qr { flex:0 0 ${qr}mm; width:${qr}mm; height:${qr}mm; }
     .product-qr svg { display:block; width:100%; height:100%; }
     .product-details {
@@ -166,7 +166,7 @@ export function buildLabelsHtml(labels: PrintableLabel[], paper: LabelPaper): st
     .product-name { font-size:12px; line-height:1.15; font-weight:700; margin-bottom:1mm; }
     .product-qr-id { font-size:9px; font-weight:700; }
     .product-footer {
-      flex:0 0 auto; padding-top:.4mm; border-top:.35mm solid #111;
+      flex:0 0 auto; padding-top:0; border-top:.35mm solid #111;
       overflow:hidden; font-size:9px !important; line-height:1.2;
     }
     .product-address { margin-top:.4mm; overflow-wrap:anywhere; }
